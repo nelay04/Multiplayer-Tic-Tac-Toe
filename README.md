@@ -116,8 +116,8 @@ Switch between dark and light mode and choose from four colour presets (or pick 
 1. Clone the repository and install dependencies:
 
    ```bash
-   git clone <repo-url>
-   cd multiplayer-tic-tac-toe
+   git clone https://github.com/nelay04/Multiplayer-Tic-Tac-Toe.git
+   cd Multiplayer-Tic-Tac-Toe
    npm install
    ```
 
