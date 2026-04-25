@@ -1,0 +1,5 @@
+{
+  "name": "Multiplayer Tic-Tac-Toe",
+  "description": "A real-time multiplayer Tic-Tac-Toe game with a lobby system, invitations, and a vs-computer mode.",
+  "requestFramePermissions": []
+}
