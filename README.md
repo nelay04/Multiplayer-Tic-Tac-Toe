@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="assets/lobby.png" alt="Game Lobby" width="100%" />
+  <img src="assets/lobby.png" alt="Game Lobby" width="80%" />
 </p>
 
 ---
@@ -49,7 +49,7 @@ Three difficulty levels: **Easy** (random), **Medium** (mixed), **Hard** (unbeat
 ### Theme & Colour Customisation
 
 <p align="center">
-  <img src="assets/theme.png" alt="Appearance Settings" width="100%" />
+  <img src="assets/theme.png" alt="Appearance Settings" width="80%" />
 </p>
 
 Switch between dark and light mode and choose from four colour presets (or pick your own) for X and O pieces.
