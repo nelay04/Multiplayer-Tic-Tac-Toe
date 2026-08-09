@@ -76,6 +76,10 @@ Switch between dark and light mode and choose from four colour presets (or pick 
 ├── vite.config.ts           # Vite configuration
 ├── tsconfig.json            # TypeScript configuration
 ├── .env.example             # Environment variable template
+├── docker-compose.yml       # Docker Compose service definition
+├── docker/                  # Docker build assets
+│   ├── Dockerfile           # Application image (build + runtime)
+│   └── entrypoint.sh        # Validates required env vars before start
 ├── assets/                  # Screenshots & static assets
 ├── server/                  # Backend (Node.js / Express / Socket.IO)
 │   ├── index.ts             # Entry point = HTTP, Vite middleware, DB connect
@@ -149,6 +153,49 @@ The server starts on <http://localhost:3000>. Vite serves the React frontend wit
 npm run build   # build the React frontend into dist/
 npm run start   # serve the built frontend + API on PORT
 ```
+
+---
+
+## Docker Deployment
+
+The app ships with a `Dockerfile` (in `docker/`) and a root `docker-compose.yml`. All configuration is read from `.env` — nothing is hardcoded in the compose file, so update `.env` to change the port, database, or mode.
+
+### Prerequisites
+
+- Docker and Docker Compose
+- A `.env` file in the project root (copy it from `.env.example` if you haven't already):
+
+  ```bash
+  cp .env.example .env
+  ```
+
+### Build & Run
+
+```bash
+docker compose up --build
+```
+
+This will:
+
+1. Build the image from [docker/Dockerfile](docker/Dockerfile) — installs dependencies and runs `npm run build` to produce `dist/`.
+2. Start the container via [docker/entrypoint.sh](docker/entrypoint.sh), which fails fast if `MONGODB_URI`, `PORT`, or `NODE_ENV` are missing from `.env`.
+3. Run `npm start`, publishing the container on `${PORT}` (from `.env`) mapped to the same host port.
+
+The app will be available at `http://localhost:$PORT` (using the `PORT` value from your `.env`).
+
+To run in the background:
+
+```bash
+docker compose up --build -d
+```
+
+To stop:
+
+```bash
+docker compose down
+```
+
+> **Note:** Set `NODE_ENV=production` in `.env` before deploying so the container serves the optimized static build instead of the Vite dev middleware.
 
 ---
 
