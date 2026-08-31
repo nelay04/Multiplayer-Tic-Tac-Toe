@@ -1,20 +1,42 @@
-import React from 'react';
-import { motion } from 'motion/react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { X as XIcon, Circle, ArrowLeft } from 'lucide-react';
 import type { GameState } from '../types';
+
+export interface ReactionBubble {
+  id: number;
+  emoji: string;
+  from: string;
+  mine: boolean;
+  x: number;
+}
+
+const REACTION_EMOJIS = ['👍', '👎', '😂', '😭', '😴', '😈', '😍'];
+const REACTION_SEND_COOLDOWN_MS = 450;
 
 interface GameProps {
   currentUser: string;
   gameState: GameState;
   xColor: string;
   oColor: string;
+  reactions: ReactionBubble[];
   onMakeMove: (index: number) => void;
   onLeave: () => void;
+  onSendReaction: (emoji: string) => void;
 }
 
-export default function Game({ currentUser, gameState, xColor, oColor, onMakeMove, onLeave }: GameProps) {
+export default function Game({ currentUser, gameState, xColor, oColor, reactions, onMakeMove, onLeave, onSendReaction }: GameProps) {
   const { player1, player2, board, turn, status, winner, winningLine } = gameState;
-  
+
+  const [reactionCooldown, setReactionCooldown] = useState(false);
+
+  const handleSendReaction = (emoji: string) => {
+    if (reactionCooldown) return;
+    onSendReaction(emoji);
+    setReactionCooldown(true);
+    setTimeout(() => setReactionCooldown(false), REACTION_SEND_COOLDOWN_MS);
+  };
+
   const isMyTurn = turn === currentUser && status === 'playing';
 
   const renderCell = (index: number) => {
@@ -59,8 +81,8 @@ export default function Game({ currentUser, gameState, xColor, oColor, onMakeMov
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-4 transition-colors">
-      <div className="w-full max-w-md">
-        
+      <div className="relative w-full max-w-md">
+
         <div className="flex justify-between items-center mb-8">
           <button 
             onClick={onLeave}
@@ -152,6 +174,20 @@ export default function Game({ currentUser, gameState, xColor, oColor, onMakeMov
           </div>
         </div>
 
+        <div className="mb-6 flex justify-center items-center gap-1 sm:gap-2 bg-white dark:bg-zinc-900/50 p-2 rounded-xl border border-zinc-200 dark:border-zinc-800/50 shadow-sm">
+          {REACTION_EMOJIS.map((emoji) => (
+            <button
+              key={emoji}
+              onClick={() => handleSendReaction(emoji)}
+              disabled={reactionCooldown}
+              className="text-2xl w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 active:scale-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label={`Send ${emoji} reaction`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+
         {status !== 'playing' && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }}
@@ -166,6 +202,26 @@ export default function Game({ currentUser, gameState, xColor, oColor, onMakeMov
             </button>
           </motion.div>
         )}
+
+        <div className="absolute bottom-28 pointer-events-none z-30" style={{ left: '50%', transform: 'translateX(-50%)' }}>
+          <AnimatePresence>
+            {reactions.map((r) => (
+              <motion.div
+                key={r.id}
+                initial={{ opacity: 0, y: 0, scale: 0.4, x: r.x }}
+                animate={{ opacity: [0, 1, 1, 0], y: -160, scale: [0.4, 1.3, 1, 0.9], x: r.x }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 1.8, times: [0, 0.15, 0.75, 1], ease: 'easeOut' }}
+                className="absolute -ml-6 -mt-6 flex flex-col items-center"
+              >
+                <span className="text-5xl leading-none drop-shadow-lg">{r.emoji}</span>
+                <span className="mt-1 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-zinc-900/85 text-white whitespace-nowrap">
+                  {r.mine ? 'You' : r.from}
+                </span>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
 
       </div>
     </div>

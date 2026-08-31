@@ -9,6 +9,11 @@ const WIN_PATTERNS = [
   [0, 4, 8], [2, 4, 6],             // diagonals
 ];
 
+const REACTION_EMOJIS = ['👍', '👎', '😂', '😭', '😴', '😈', '😍'];
+const REACTION_COOLDOWN_MS = 400;
+// Per-socket throttle for reactions; entries are removed on disconnect.
+const lastReactionAt = new Map<string, number>();
+
 async function broadcastUsers(io: Server) {
   const users = await User.find({ status: { $ne: 'offline' } }).select('username status -_id');
   io.emit('users_update', users);
@@ -184,6 +189,30 @@ export function registerSocketHandlers(io: Server): void {
       }
     });
 
+    socket.on('send_reaction', async ({ gameId, emoji }: { gameId: string; emoji: string }) => {
+      const username = socket.data.username as string | undefined;
+      if (!username || !REACTION_EMOJIS.includes(emoji)) return;
+
+      const now = Date.now();
+      const last = lastReactionAt.get(socket.id) ?? 0;
+      if (now - last < REACTION_COOLDOWN_MS) return;
+      lastReactionAt.set(socket.id, now);
+
+      try {
+        const game = await Game.findById(gameId);
+        if (!game) return;
+        if (game.player1 !== username && game.player2 !== username) return;
+
+        const opponentUsername = game.player1 === username ? game.player2 : game.player1;
+        const opponent = await User.findOne({ username: opponentUsername });
+        if (opponent?.socketId) {
+          io.to(opponent.socketId).emit('reaction_received', { from: username, emoji });
+        }
+      } catch (error) {
+        console.error('Reaction error:', error);
+      }
+    });
+
     socket.on('leave_game', async (gameId: string) => {
       const username = socket.data.username as string | undefined;
       if (!username) return;
@@ -207,6 +236,7 @@ export function registerSocketHandlers(io: Server): void {
 
     socket.on('disconnect', async () => {
       console.log('User disconnected:', socket.id);
+      lastReactionAt.delete(socket.id);
       const username = socket.data.username as string | undefined;
       if (!username) return;
 

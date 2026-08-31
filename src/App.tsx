@@ -3,7 +3,7 @@ import { socket } from './lib/socket';
 import { useSocketEvents } from './hooks/useSocketEvents';
 import Login from './components/Login';
 import Lobby from './components/Lobby';
-import Game from './components/Game';
+import Game, { ReactionBubble } from './components/Game';
 import ComputerGame from './components/ComputerGame';
 import Toast, { ToastMessage } from './components/Toast';
 import type { UserType, GameState, GameHistory, Theme } from './types';
@@ -17,6 +17,7 @@ export default function App() {
   const [invitations, setInvitations] = useState<string[]>([]);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [history, setHistory] = useState<GameHistory[]>([]);
+  const [reactions, setReactions] = useState<ReactionBubble[]>([]);
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [waitingInvites, setWaitingInvites] = useState<string[]>([]);
@@ -36,6 +37,15 @@ export default function App() {
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id));
     }, 3000);
+  };
+
+  const pushReaction = (emoji: string, from: string, mine: boolean) => {
+    const id = Date.now() + Math.random();
+    const x = (Math.random() - 0.5) * 60;
+    setReactions(prev => [...prev, { id, emoji, from, mine, x }]);
+    setTimeout(() => {
+      setReactions(prev => prev.filter(r => r.id !== id));
+    }, 1800);
   };
 
   useSocketEvents({
@@ -70,6 +80,7 @@ export default function App() {
     onGameStart: (data) => {
       showToast('Game started!');
       setGameState(data);
+      setReactions([]);
       setView('game');
       setInvitations([]);
       setWaitingInvites([]);
@@ -79,6 +90,9 @@ export default function App() {
     },
     onGameAbandoned: () => {
       setGameState(prev => prev ? { ...prev, status: 'abandoned' } : null);
+    },
+    onReactionReceived: (data) => {
+      pushReaction(data.emoji, data.from, false);
     },
   });
 
@@ -97,6 +111,7 @@ export default function App() {
     setHistory([]);
     setWaitingInvites([]);
     setCooldownInvites([]);
+    setReactions([]);
   };
 
   const handleInvite = (targetUsername: string) => {
@@ -126,7 +141,14 @@ export default function App() {
       socket.emit('leave_game', gameState.id);
     }
     setGameState(null);
+    setReactions([]);
     setView('lobby');
+  };
+
+  const handleSendReaction = (emoji: string) => {
+    if (!gameState?.id || !username) return;
+    socket.emit('send_reaction', { gameId: gameState.id, emoji });
+    pushReaction(emoji, username, true);
   };
 
   return (
@@ -161,8 +183,10 @@ export default function App() {
           gameState={gameState}
           xColor={xColor}
           oColor={oColor}
+          reactions={reactions}
           onMakeMove={handleMakeMove}
           onLeave={handleLeaveGame}
+          onSendReaction={handleSendReaction}
         />
       )}
       {view === 'computer' && (

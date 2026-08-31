@@ -12,6 +12,7 @@ interface SocketEventHandlers {
   onGameStart: (data: GameState) => void;
   onGameUpdate: (data: GameState) => void;
   onGameAbandoned: () => void;
+  onReactionReceived: (data: { from: string; emoji: string }) => void;
 }
 
 export function useSocketEvents(handlers: SocketEventHandlers): void {
@@ -37,6 +38,8 @@ export function useSocketEvents(handlers: SocketEventHandlers): void {
       handlersRef.current.onGameUpdate(data);
     const onGameAbandoned = () =>
       handlersRef.current.onGameAbandoned();
+    const onReactionReceived = (data: { from: string; emoji: string }) =>
+      handlersRef.current.onReactionReceived(data);
 
     socket.on('register_success', onRegisterSuccess);
     socket.on('register_error', onRegisterError);
@@ -47,6 +50,7 @@ export function useSocketEvents(handlers: SocketEventHandlers): void {
     socket.on('game_start', onGameStart);
     socket.on('game_update', onGameUpdate);
     socket.on('game_abandoned', onGameAbandoned);
+    socket.on('reaction_received', onReactionReceived);
 
     return () => {
       socket.off('register_success', onRegisterSuccess);
@@ -58,6 +62,7 @@ export function useSocketEvents(handlers: SocketEventHandlers): void {
       socket.off('game_start', onGameStart);
       socket.off('game_update', onGameUpdate);
       socket.off('game_abandoned', onGameAbandoned);
+      socket.off('reaction_received', onReactionReceived);
     };
   }, []);
 }
