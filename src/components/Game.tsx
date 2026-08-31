@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X as XIcon, Circle, ArrowLeft } from 'lucide-react';
 import Chat from './Chat';
 import type { GameState, ChatMessage } from '../types';
+import { REACTION_EMOJIS } from '../lib/reactions';
 
 export interface ReactionBubble {
   id: number;
@@ -12,7 +13,6 @@ export interface ReactionBubble {
   x: number;
 }
 
-const REACTION_EMOJIS = ['👍', '👎', '😂', '😭', '😴', '😈', '😍'];
 const REACTION_SEND_COOLDOWN_MS = 450;
 
 interface GameProps {

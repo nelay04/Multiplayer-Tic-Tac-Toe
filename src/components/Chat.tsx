@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MessageSquare, Send, Lock } from 'lucide-react';
 import type { ChatMessage } from '../types';
+import { REACTION_EMOJIS } from '../lib/reactions';
 
 const MAX_CHAT_LENGTH = 500;
 
@@ -63,9 +64,9 @@ export default function Chat({
 
   return (
     <div
-      className={`flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden ${className}`}
+      className={`flex flex-col bg-white/60 dark:bg-zinc-900/40 backdrop-blur-xl border border-white/40 dark:border-white/10 shadow-lg shadow-zinc-900/5 dark:shadow-black/20 rounded-2xl overflow-hidden ${className}`}
     >
-      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-zinc-200/60 dark:border-white/10">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
           <h2 className="font-semibold text-zinc-900 dark:text-white">Chat</h2>
@@ -87,6 +88,9 @@ export default function Chat({
           <AnimatePresence initial={false}>
             {messages.map((message) => {
               const mine = message.from === currentUser;
+              // Reactions arrive as ordinary messages; they read better as a
+              // bare emoji than inside a chat bubble.
+              const isReaction = REACTION_EMOJIS.includes(message.text.trim());
               return (
                 <motion.div
                   key={message.id}
@@ -98,11 +102,15 @@ export default function Chat({
                     <span className="text-xs font-medium text-zinc-500 mb-0.5 px-1">{message.from}</span>
                   )}
                   <div
-                    className={`max-w-[85%] px-3 py-2 rounded-xl text-sm break-words whitespace-pre-wrap ${
-                      mine
-                        ? 'bg-indigo-600 text-white rounded-br-sm'
-                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-bl-sm'
-                    }`}
+                    className={
+                      isReaction
+                        ? 'text-3xl leading-none px-1 py-0.5'
+                        : `max-w-[85%] px-3 py-2 rounded-xl text-sm break-words whitespace-pre-wrap ${
+                            mine
+                              ? 'bg-indigo-600 text-white rounded-br-sm'
+                              : 'bg-zinc-100/80 dark:bg-zinc-800/70 text-zinc-900 dark:text-zinc-100 rounded-bl-sm'
+                          }`
+                    }
                   >
                     {message.text}
                   </div>
@@ -117,7 +125,7 @@ export default function Chat({
       </div>
 
       {hasReactions && (
-        <div className="flex justify-between items-center gap-0.5 px-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+        <div className="flex justify-between items-center gap-0.5 px-3 pt-2 border-t border-zinc-200/60 dark:border-white/10">
           {reactionEmojis!.map((emoji) => (
             <button
               key={emoji}
@@ -137,7 +145,7 @@ export default function Chat({
         <form
           onSubmit={handleSubmit}
           className={`flex items-center gap-2 px-3 pb-3 pt-2 ${
-            hasReactions ? '' : 'border-t border-zinc-200 dark:border-zinc-800'
+            hasReactions ? '' : 'border-t border-zinc-200/60 dark:border-white/10'
           }`}
         >
           <input
@@ -148,7 +156,7 @@ export default function Chat({
             maxLength={MAX_CHAT_LENGTH}
             placeholder={locked ? lockedLabel : 'Type a message...'}
             aria-label="Chat message"
-            className="flex-1 min-w-0 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex-1 min-w-0 bg-white/70 dark:bg-zinc-950/50 border border-zinc-200/70 dark:border-white/10 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           />
           <button
             type="submit"

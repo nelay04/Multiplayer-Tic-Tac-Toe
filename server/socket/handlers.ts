@@ -225,11 +225,35 @@ export function registerSocketHandlers(io: Server): void {
         if (!game) return;
         if (game.player1 !== username && game.player2 !== username) return;
 
-        const opponentUsername = game.player1 === username ? game.player2 : game.player1;
-        const opponent = await User.findOne({ username: opponentUsername });
+        // Reactions are chat too: persisted alongside typed messages so they
+        // stay in the transcript instead of vanishing with the bubble.
+        if (game.status !== 'playing') return;
+
+        const message = new Message({
+          gameId: game._id,
+          sender: username,
+          content: encryptMessage(emoji, game._id.toString(), username),
+        });
+        await message.save();
+
+        const payload = {
+          id: message._id.toString(),
+          gameId: game._id.toString(),
+          from: username,
+          text: emoji,
+          createdAt: message.createdAt,
+        };
+
+        const [p1, p2] = await Promise.all([
+          User.findOne({ username: game.player1 }),
+          User.findOne({ username: game.player2 }),
+        ]);
+        const opponent = game.player1 === username ? p2 : p1;
         if (opponent?.socketId) {
           io.to(opponent.socketId).emit('reaction_received', { from: username, emoji });
         }
+        if (p1?.socketId) io.to(p1.socketId).emit('chat_message', payload);
+        if (p2?.socketId) io.to(p2.socketId).emit('chat_message', payload);
       } catch (error) {
         console.error('Reaction error:', error);
       }
