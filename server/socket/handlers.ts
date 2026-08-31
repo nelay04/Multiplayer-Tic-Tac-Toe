@@ -1,6 +1,7 @@
 import type { Server, Socket } from 'socket.io';
 import { User } from '../models/User';
 import { Game } from '../models/Game';
+import { hashPassword, verifyPassword } from '../utils/password';
 
 const WIN_PATTERNS = [
   [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
@@ -30,9 +31,10 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('register', async (credentials: { username: string; password: string }) => {
       const { username, password } = credentials;
       try {
-        let user = await User.findOne({ username });
+        let user = await User.findOne({ username }).select('+password');
         if (user) {
-          if (user.password !== password) {
+          const { valid, needsRehash } = await verifyPassword(user.password, password);
+          if (!valid) {
             socket.emit('register_error', 'Incorrect password.');
             return;
           }
@@ -40,12 +42,15 @@ export function registerSocketHandlers(io: Server): void {
             socket.emit('register_error', 'User is already logged in elsewhere.');
             return;
           }
+          if (needsRehash) {
+            user.password = await hashPassword(password);
+          }
           user.socketId = socket.id;
           user.status = 'idle';
           user.lastSeen = new Date();
           await user.save();
         } else {
-          user = new User({ username, password, socketId: socket.id, status: 'idle' });
+          user = new User({ username, password: await hashPassword(password), socketId: socket.id, status: 'idle' });
           await user.save();
         }
 
