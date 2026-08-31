@@ -10,3 +10,5 @@ services:
     ports:
       - "${PORT}:${PORT}"
     restart: unless-stopped
+    # Room for the graceful shutdown to flush in-flight writes before SIGKILL.
+    stop_grace_period: 30s
