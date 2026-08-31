@@ -1,0 +1,135 @@
+import { useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { MessageSquare, Send, Lock } from 'lucide-react';
+import type { ChatMessage } from '../types';
+
+const MAX_CHAT_LENGTH = 500;
+
+interface ChatProps {
+  currentUser: string;
+  messages: ChatMessage[];
+  /** View-only mode: renders the transcript with no composer (match history). */
+  readOnly?: boolean;
+  /** Composer is shown but locked, e.g. once the match has ended. */
+  locked?: boolean;
+  lockedLabel?: string;
+  emptyLabel?: string;
+  className?: string;
+  onSend?: (text: string) => void;
+}
+
+function formatTime(value: string) {
+  return new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+export default function Chat({
+  currentUser,
+  messages,
+  readOnly = false,
+  locked = false,
+  lockedLabel = 'This match has ended.',
+  emptyLabel = 'No messages yet.',
+  className = '',
+  onSend,
+}: ChatProps) {
+  const [draft, setDraft] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Pin to the newest message as the conversation grows.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages.length]);
+
+  const canSend = !readOnly && !locked && draft.trim().length > 0;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSend) return;
+    onSend?.(draft.trim());
+    setDraft('');
+  };
+
+  return (
+    <div
+      className={`flex flex-col bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl overflow-hidden ${className}`}
+    >
+      <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+          <h2 className="font-semibold text-zinc-900 dark:text-white">Chat</h2>
+        </div>
+        {readOnly && (
+          <span className="flex items-center gap-1 text-xs font-medium text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full">
+            <Lock className="w-3 h-3" />
+            View only
+          </span>
+        )}
+      </div>
+
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-2">
+        {messages.length === 0 ? (
+          <div className="h-full flex items-center justify-center text-center text-sm text-zinc-500 py-6">
+            <p>{emptyLabel}</p>
+          </div>
+        ) : (
+          <AnimatePresence initial={false}>
+            {messages.map((message) => {
+              const mine = message.from === currentUser;
+              return (
+                <motion.div
+                  key={message.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex flex-col ${mine ? 'items-end' : 'items-start'}`}
+                >
+                  {!mine && (
+                    <span className="text-xs font-medium text-zinc-500 mb-0.5 px-1">{message.from}</span>
+                  )}
+                  <div
+                    className={`max-w-[85%] px-3 py-2 rounded-xl text-sm break-words whitespace-pre-wrap ${
+                      mine
+                        ? 'bg-indigo-600 text-white rounded-br-sm'
+                        : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 rounded-bl-sm'
+                    }`}
+                  >
+                    {message.text}
+                  </div>
+                  <span className="text-[10px] text-zinc-400 dark:text-zinc-600 mt-0.5 px-1">
+                    {formatTime(message.createdAt)}
+                  </span>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        )}
+      </div>
+
+      {!readOnly && (
+        <form
+          onSubmit={handleSubmit}
+          className="flex items-center gap-2 p-3 border-t border-zinc-200 dark:border-zinc-800"
+        >
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value.slice(0, MAX_CHAT_LENGTH))}
+            disabled={locked}
+            maxLength={MAX_CHAT_LENGTH}
+            placeholder={locked ? lockedLabel : 'Type a message...'}
+            aria-label="Chat message"
+            className="flex-1 min-w-0 bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-600 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          />
+          <button
+            type="submit"
+            disabled={!canSend}
+            aria-label="Send message"
+            className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-xl transition-colors disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-500 disabled:cursor-not-allowed"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}

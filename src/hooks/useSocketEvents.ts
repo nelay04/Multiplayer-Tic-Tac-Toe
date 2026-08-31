@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { socket } from '../lib/socket';
-import type { UserType, GameState, GameHistory } from '../types';
+import type { UserType, GameState, GameHistory, ChatMessage } from '../types';
 
 interface SocketEventHandlers {
   onRegisterSuccess: (data: { username: string }) => void;
@@ -13,6 +13,8 @@ interface SocketEventHandlers {
   onGameUpdate: (data: GameState) => void;
   onGameAbandoned: () => void;
   onReactionReceived: (data: { from: string; emoji: string }) => void;
+  onChatMessage: (message: ChatMessage & { gameId: string }) => void;
+  onChatHistory: (data: { gameId: string; messages: ChatMessage[] }) => void;
 }
 
 export function useSocketEvents(handlers: SocketEventHandlers): void {
@@ -40,6 +42,10 @@ export function useSocketEvents(handlers: SocketEventHandlers): void {
       handlersRef.current.onGameAbandoned();
     const onReactionReceived = (data: { from: string; emoji: string }) =>
       handlersRef.current.onReactionReceived(data);
+    const onChatMessage = (message: ChatMessage & { gameId: string }) =>
+      handlersRef.current.onChatMessage(message);
+    const onChatHistory = (data: { gameId: string; messages: ChatMessage[] }) =>
+      handlersRef.current.onChatHistory(data);
 
     socket.on('register_success', onRegisterSuccess);
     socket.on('register_error', onRegisterError);
@@ -51,6 +57,8 @@ export function useSocketEvents(handlers: SocketEventHandlers): void {
     socket.on('game_update', onGameUpdate);
     socket.on('game_abandoned', onGameAbandoned);
     socket.on('reaction_received', onReactionReceived);
+    socket.on('chat_message', onChatMessage);
+    socket.on('chat_history', onChatHistory);
 
     return () => {
       socket.off('register_success', onRegisterSuccess);
@@ -63,6 +71,8 @@ export function useSocketEvents(handlers: SocketEventHandlers): void {
       socket.off('game_update', onGameUpdate);
       socket.off('game_abandoned', onGameAbandoned);
       socket.off('reaction_received', onReactionReceived);
+      socket.off('chat_message', onChatMessage);
+      socket.off('chat_history', onChatHistory);
     };
   }, []);
 }

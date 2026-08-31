@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-required_vars="MONGODB_URI PORT NODE_ENV"
+required_vars="MONGODB_URI PORT NODE_ENV CHAT_ENCRYPTION_KEY"
 
 for var in $required_vars; do
   eval value=\$$var

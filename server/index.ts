@@ -9,6 +9,7 @@ import cors from 'cors';
 import { User } from './models/User';
 import { Game } from './models/Game';
 import { registerSocketHandlers } from './socket/handlers';
+import { assertEncryptionKey } from './utils/encryption';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
@@ -33,6 +34,10 @@ async function resetEphemeralState() {
 }
 
 async function startServer() {
+  // Validated before anything else so a bad chat key fails the deploy rather
+  // than the first message a player tries to send.
+  assertEncryptionKey();
+
   const app = express();
   const PORT = parseInt(process.env.PORT ?? '3000', 10);
 

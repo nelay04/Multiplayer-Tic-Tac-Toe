@@ -1,7 +1,9 @@
 import type { Server, Socket } from 'socket.io';
 import { User } from '../models/User';
 import { Game } from '../models/Game';
+import { Message } from '../models/Message';
 import { hashPassword, verifyPassword } from '../utils/password';
+import { encryptMessage, decryptMessage } from '../utils/encryption';
 
 const WIN_PATTERNS = [
   [0, 1, 2], [3, 4, 5], [6, 7, 8], // rows
@@ -13,6 +15,11 @@ const REACTION_EMOJIS = ['👍', '👎', '😂', '😭', '😴', '😈', '😍']
 const REACTION_COOLDOWN_MS = 400;
 // Per-socket throttle for reactions; entries are removed on disconnect.
 const lastReactionAt = new Map<string, number>();
+
+const MAX_CHAT_LENGTH = 500;
+const CHAT_COOLDOWN_MS = 350;
+// Per-socket throttle for chat messages; entries are removed on disconnect.
+const lastChatAt = new Map<string, number>();
 
 async function broadcastUsers(io: Server) {
   const users = await User.find({ status: { $ne: 'offline' } }).select('username status -_id');
@@ -27,6 +34,21 @@ async function sendHistory(io: Server, username: string, socketId: string) {
     .sort({ createdAt: -1 })
     .limit(10);
   io.to(socketId).emit('history_update', history);
+}
+
+/**
+ * Loads a game's transcript and decrypts it for delivery. A row that fails to
+ * decrypt is kept in place with a placeholder body so the surrounding
+ * conversation still reads in order rather than silently losing a turn.
+ */
+async function loadTranscript(gameId: string) {
+  const messages = await Message.find({ gameId }).sort({ createdAt: 1 }).limit(500);
+  return messages.map((message) => ({
+    id: message._id.toString(),
+    from: message.sender,
+    text: decryptMessage(message.content, gameId, message.sender) ?? '[unable to decrypt message]',
+    createdAt: message.createdAt,
+  }));
 }
 
 export function registerSocketHandlers(io: Server): void {
@@ -213,6 +235,70 @@ export function registerSocketHandlers(io: Server): void {
       }
     });
 
+    socket.on('send_chat', async ({ gameId, text }: { gameId: string; text: string }) => {
+      const username = socket.data.username as string | undefined;
+      if (!username || typeof text !== 'string') return;
+
+      const trimmed = text.trim();
+      if (!trimmed || trimmed.length > MAX_CHAT_LENGTH) return;
+
+      const now = Date.now();
+      if (now - (lastChatAt.get(socket.id) ?? 0) < CHAT_COOLDOWN_MS) return;
+      lastChatAt.set(socket.id, now);
+
+      try {
+        const game = await Game.findById(gameId);
+        if (!game) return;
+        if (game.player1 !== username && game.player2 !== username) return;
+        // Once a match ends its transcript is frozen: history is view-only.
+        if (game.status !== 'playing') return;
+
+        const message = new Message({
+          gameId: game._id,
+          sender: username,
+          content: encryptMessage(trimmed, game._id.toString(), username),
+        });
+        await message.save();
+
+        const payload = {
+          id: message._id.toString(),
+          gameId: game._id.toString(),
+          from: username,
+          text: trimmed,
+          createdAt: message.createdAt,
+        };
+
+        // Echoed to the sender too, so both clients render the same
+        // server-assigned id and ordering instead of an optimistic guess.
+        const [p1, p2] = await Promise.all([
+          User.findOne({ username: game.player1 }),
+          User.findOne({ username: game.player2 }),
+        ]);
+        if (p1?.socketId) io.to(p1.socketId).emit('chat_message', payload);
+        if (p2?.socketId) io.to(p2.socketId).emit('chat_message', payload);
+      } catch (error) {
+        console.error('Chat error:', error);
+      }
+    });
+
+    socket.on('get_chat_history', async (gameId: string) => {
+      const username = socket.data.username as string | undefined;
+      if (!username || typeof gameId !== 'string') return;
+
+      try {
+        const game = await Game.findById(gameId);
+        // Only the two players may read a transcript.
+        if (!game || (game.player1 !== username && game.player2 !== username)) return;
+
+        socket.emit('chat_history', {
+          gameId: game._id.toString(),
+          messages: await loadTranscript(game._id.toString()),
+        });
+      } catch (error) {
+        console.error('Chat history error:', error);
+      }
+    });
+
     socket.on('leave_game', async (gameId: string) => {
       const username = socket.data.username as string | undefined;
       if (!username) return;
@@ -237,6 +323,7 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('disconnect', async () => {
       console.log('User disconnected:', socket.id);
       lastReactionAt.delete(socket.id);
+      lastChatAt.delete(socket.id);
       const username = socket.data.username as string | undefined;
       if (!username) return;
 

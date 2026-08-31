@@ -26,4 +26,11 @@ export interface GameHistory {
   endTime?: string;
 }
 
+export interface ChatMessage {
+  id: string;
+  from: string;
+  text: string;
+  createdAt: string;
+}
+
 export type Theme = 'dark' | 'light';

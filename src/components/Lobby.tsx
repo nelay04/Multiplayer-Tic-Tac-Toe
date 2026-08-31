@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User as UserIcon, Play, Swords, LogOut, History, Minus, X as XIcon, Settings, Palette, Moon, Sun, Crown, Handshake, HeartCrack } from 'lucide-react';
-import type { UserType, GameHistory, Theme } from '../types';
+import Chat from './Chat';
+import type { UserType, GameHistory, ChatMessage, Theme } from '../types';
 
 interface LobbyProps {
   currentUser: string;
   users: UserType[];
   invitations: string[];
   history: GameHistory[];
+  /** Decrypted transcripts of finished matches, keyed by game id. */
+  chatHistories: Record<string, ChatMessage[]>;
+  onLoadChatHistory: (gameId: string) => void;
   waitingInvites: string[];
   cooldownInvites: {username: string, expiresAt: number}[];
   theme: Theme;
@@ -106,6 +110,8 @@ export default function Lobby({
   users, 
   invitations, 
   history,
+  chatHistories,
+  onLoadChatHistory,
   waitingInvites,
   cooldownInvites,
   theme,
@@ -123,6 +129,13 @@ export default function Lobby({
   const [showSettings, setShowSettings] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<GameHistory | null>(null);
   const onlineUsers = users.filter(u => u.username !== currentUser);
+
+  // Transcripts are pulled only when a match is actually opened, then cached
+  // by the parent so reopening the same match does not hit the server again.
+  const openMatch = (game: GameHistory) => {
+    setSelectedMatch(game);
+    if (!chatHistories[game._id]) onLoadChatHistory(game._id);
+  };
 
   const colorPresets = [
     { x: '#a546f7', o: '#ffff08', name: 'Neon' },
@@ -337,7 +350,7 @@ export default function Lobby({
                     return (
                       <div 
                         key={game._id} 
-                        onClick={() => setSelectedMatch(game)}
+                        onClick={() => openMatch(game)}
                         className="flex items-center justify-between p-3 rounded-xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800/50 cursor-pointer hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors"
                       >
                         <div className="flex items-center gap-3">
@@ -393,7 +406,7 @@ export default function Lobby({
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-2xl max-w-sm w-full"
+              className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 shadow-2xl w-full max-w-sm lg:max-w-3xl max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-zinc-900 dark:text-white">Match Snapshot</h3>
@@ -405,113 +418,129 @@ export default function Lobby({
                 </button>
               </div>
 
-              <div className="flex justify-between items-center mb-6 px-4">
-                <div className="text-center">
-                  <p className="font-semibold text-zinc-900 dark:text-white">{selectedMatch.player1}</p>
-                  <p className="text-xs text-zinc-500">Player 1 (X)</p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="min-w-0">
+                <div className="flex justify-between items-center mb-6 px-4">
+                  <div className="text-center">
+                    <p className="font-semibold text-zinc-900 dark:text-white">{selectedMatch.player1}</p>
+                    <p className="text-xs text-zinc-500">Player 1 (X)</p>
+                  </div>
+                  <div className="text-zinc-400 font-medium">VS</div>
+                  <div className="text-center">
+                    <p className="font-semibold text-zinc-900 dark:text-white">{selectedMatch.player2}</p>
+                    <p className="text-xs text-zinc-500">Player 2 (O)</p>
+                  </div>
                 </div>
-                <div className="text-zinc-400 font-medium">VS</div>
-                <div className="text-center">
-                  <p className="font-semibold text-zinc-900 dark:text-white">{selectedMatch.player2}</p>
-                  <p className="text-xs text-zinc-500">Player 2 (O)</p>
+
+                <div className="aspect-square w-full max-w-[240px] mx-auto bg-zinc-100 dark:bg-zinc-950 rounded-xl p-4 mb-6 relative">
+                  <div className="grid grid-cols-3 h-full relative">
+                    {selectedMatch.board.map((cell, i) => (
+                      <div 
+                        key={i} 
+                        className={`flex items-center justify-center border-zinc-300 dark:border-zinc-800
+                          ${i < 6 ? 'border-b-4' : ''} 
+                          ${i % 3 !== 2 ? 'border-r-4' : ''}
+                        `}
+                      >
+                        {cell === 'X' && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="relative w-12 h-12"
+                            style={{ color: xColor }}
+                          >
+                            <div className="absolute inset-0 bg-current rounded-full" style={{ clipPath: 'polygon(20% 0%, 0% 20%, 30% 50%, 0% 80%, 20% 100%, 50% 70%, 80% 100%, 100% 80%, 70% 50%, 100% 20%, 80% 0%, 50% 30%)' }} />
+                          </motion.div>
+                        )}
+                        {cell === 'O' && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="w-12 h-12 border-[8px] border-current rounded-full"
+                            style={{ color: oColor }}
+                          />
+                        )}
+                      </div>
+                    ))}
+                    {selectedMatch.winningLine && selectedMatch.winningLine.length === 3 && (() => {
+                      const isHorizontal = Math.floor(selectedMatch.winningLine[0] / 3) === Math.floor(selectedMatch.winningLine[1] / 3);
+                      const isVertical = selectedMatch.winningLine[0] % 3 === selectedMatch.winningLine[1] % 3;
+                      const isDiagonal1 = selectedMatch.winningLine[0] === 0 && selectedMatch.winningLine[2] === 8;
+                      const isDiagonal2 = selectedMatch.winningLine[0] === 2 && selectedMatch.winningLine[2] === 6;
+
+                      let x1 = '0', y1 = '0', x2 = '0', y2 = '0';
+                      if (isHorizontal) {
+                        const row = Math.floor(selectedMatch.winningLine[0] / 3);
+                        y1 = y2 = `${(row * 33.33) + 16.66}`;
+                        x1 = '5'; x2 = '95';
+                      } else if (isVertical) {
+                        const col = selectedMatch.winningLine[0] % 3;
+                        x1 = x2 = `${(col * 33.33) + 16.66}`;
+                        y1 = '5'; y2 = '95';
+                      } else if (isDiagonal1) {
+                        x1 = '5'; y1 = '5'; x2 = '95'; y2 = '95';
+                      } else if (isDiagonal2) {
+                        x1 = '95'; y1 = '5'; x2 = '5'; y2 = '95';
+                      }
+
+                      const winningPiece = selectedMatch.board[selectedMatch.winningLine[0]];
+                      const strokeColor = winningPiece === 'X' ? xColor : oColor;
+
+                      return (
+                        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 10 }}>
+                          <motion.line
+                            x1={`${x1}%`}
+                            y1={`${y1}%`}
+                            x2={`${x2}%`}
+                            y2={`${y2}%`}
+                            stroke={strokeColor}
+                            strokeWidth="4"
+                            strokeLinecap="round"
+                            initial={{ pathLength: 0 }}
+                            animate={{ pathLength: 1 }}
+                            transition={{ duration: 0.5, ease: "easeOut" }}
+                          />
+                        </svg>
+                      );
+                    })()}
+                  </div>
                 </div>
-              </div>
 
-              <div className="aspect-square w-full max-w-[240px] mx-auto bg-zinc-100 dark:bg-zinc-950 rounded-xl p-4 mb-6 relative">
-                <div className="grid grid-cols-3 h-full relative">
-                  {selectedMatch.board.map((cell, i) => (
-                    <div 
-                      key={i} 
-                      className={`flex items-center justify-center border-zinc-300 dark:border-zinc-800
-                        ${i < 6 ? 'border-b-4' : ''} 
-                        ${i % 3 !== 2 ? 'border-r-4' : ''}
-                      `}
-                    >
-                      {cell === 'X' && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="relative w-12 h-12"
-                          style={{ color: xColor }}
-                        >
-                          <div className="absolute inset-0 bg-current rounded-full" style={{ clipPath: 'polygon(20% 0%, 0% 20%, 30% 50%, 0% 80%, 20% 100%, 50% 70%, 80% 100%, 100% 80%, 70% 50%, 100% 20%, 80% 0%, 50% 30%)' }} />
-                        </motion.div>
-                      )}
-                      {cell === 'O' && (
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className="w-12 h-12 border-[8px] border-current rounded-full"
-                          style={{ color: oColor }}
-                        />
-                      )}
-                    </div>
-                  ))}
-                  {selectedMatch.winningLine && selectedMatch.winningLine.length === 3 && (() => {
-                    const isHorizontal = Math.floor(selectedMatch.winningLine[0] / 3) === Math.floor(selectedMatch.winningLine[1] / 3);
-                    const isVertical = selectedMatch.winningLine[0] % 3 === selectedMatch.winningLine[1] % 3;
-                    const isDiagonal1 = selectedMatch.winningLine[0] === 0 && selectedMatch.winningLine[2] === 8;
-                    const isDiagonal2 = selectedMatch.winningLine[0] === 2 && selectedMatch.winningLine[2] === 6;
-
-                    let x1 = '0', y1 = '0', x2 = '0', y2 = '0';
-                    if (isHorizontal) {
-                      const row = Math.floor(selectedMatch.winningLine[0] / 3);
-                      y1 = y2 = `${(row * 33.33) + 16.66}`;
-                      x1 = '5'; x2 = '95';
-                    } else if (isVertical) {
-                      const col = selectedMatch.winningLine[0] % 3;
-                      x1 = x2 = `${(col * 33.33) + 16.66}`;
-                      y1 = '5'; y2 = '95';
-                    } else if (isDiagonal1) {
-                      x1 = '5'; y1 = '5'; x2 = '95'; y2 = '95';
-                    } else if (isDiagonal2) {
-                      x1 = '95'; y1 = '5'; x2 = '5'; y2 = '95';
-                    }
-
-                    const winningPiece = selectedMatch.board[selectedMatch.winningLine[0]];
-                    const strokeColor = winningPiece === 'X' ? xColor : oColor;
-
-                    return (
-                      <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 10 }}>
-                        <motion.line
-                          x1={`${x1}%`}
-                          y1={`${y1}%`}
-                          x2={`${x2}%`}
-                          y2={`${y2}%`}
-                          stroke={strokeColor}
-                          strokeWidth="4"
-                          strokeLinecap="round"
-                          initial={{ pathLength: 0 }}
-                          animate={{ pathLength: 1 }}
-                          transition={{ duration: 0.5, ease: "easeOut" }}
-                        />
-                      </svg>
-                    );
-                  })()}
+                <div className="text-center mb-4">
+                  <p className="font-semibold text-lg text-zinc-900 dark:text-white">
+                    {selectedMatch.winner === currentUser ? 'Victory!' : selectedMatch.winner === 'draw' ? 'Draw' : selectedMatch.status === 'abandoned' ? 'Abandoned' : 'Defeat'}
+                  </p>
                 </div>
-              </div>
 
-              <div className="text-center mb-4">
-                <p className="font-semibold text-lg text-zinc-900 dark:text-white">
-                  {selectedMatch.winner === currentUser ? 'Victory!' : selectedMatch.winner === 'draw' ? 'Draw' : selectedMatch.status === 'abandoned' ? 'Abandoned' : 'Defeat'}
-                </p>
-              </div>
-
-              <div className="bg-zinc-50 dark:bg-zinc-950 rounded-xl p-4 space-y-2 text-sm border border-zinc-200 dark:border-zinc-800/50">
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-500">Started</span>
-                  <span className="text-zinc-900 dark:text-zinc-100 font-medium">
-                    {new Date(selectedMatch.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(selectedMatch.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                  </span>
-                </div>
-                {selectedMatch.endTime && (
+                <div className="bg-zinc-50 dark:bg-zinc-950 rounded-xl p-4 space-y-2 text-sm border border-zinc-200 dark:border-zinc-800/50">
                   <div className="flex justify-between items-center">
-                    <span className="text-zinc-500">Ended</span>
+                    <span className="text-zinc-500">Started</span>
                     <span className="text-zinc-900 dark:text-zinc-100 font-medium">
-                      {new Date(selectedMatch.endTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(selectedMatch.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      {new Date(selectedMatch.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(selectedMatch.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </span>
                   </div>
-                )}
+                  {selectedMatch.endTime && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-500">Ended</span>
+                      <span className="text-zinc-900 dark:text-zinc-100 font-medium">
+                        {new Date(selectedMatch.endTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(selectedMatch.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                </div>
+
+                <Chat
+                  currentUser={currentUser}
+                  messages={chatHistories[selectedMatch._id] ?? []}
+                  readOnly
+                  emptyLabel={
+                    chatHistories[selectedMatch._id]
+                      ? 'No messages were sent in this match.'
+                      : 'Loading chat...'
+                  }
+                  className="h-72 lg:h-auto lg:min-h-[420px]"
+                />
               </div>
             </motion.div>
           </motion.div>

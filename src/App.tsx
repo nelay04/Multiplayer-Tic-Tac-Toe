@@ -6,7 +6,7 @@ import Lobby from './components/Lobby';
 import Game, { ReactionBubble } from './components/Game';
 import ComputerGame from './components/ComputerGame';
 import Toast, { ToastMessage } from './components/Toast';
-import type { UserType, GameState, GameHistory, Theme } from './types';
+import type { UserType, GameState, GameHistory, ChatMessage, Theme } from './types';
 
 export default function App() {
   const [username, setUsername] = useState<string | null>(null);
@@ -18,6 +18,10 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [history, setHistory] = useState<GameHistory[]>([]);
   const [reactions, setReactions] = useState<ReactionBubble[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  // Transcripts of finished matches, keyed by game id and fetched on demand
+  // when a match is opened from the history list.
+  const [chatHistories, setChatHistories] = useState<Record<string, ChatMessage[]>>({});
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [waitingInvites, setWaitingInvites] = useState<string[]>([]);
@@ -81,6 +85,7 @@ export default function App() {
       showToast('Game started!');
       setGameState(data);
       setReactions([]);
+      setChatMessages([]);
       setView('game');
       setInvitations([]);
       setWaitingInvites([]);
@@ -93,6 +98,16 @@ export default function App() {
     },
     onReactionReceived: (data) => {
       pushReaction(data.emoji, data.from, false);
+    },
+    onChatMessage: (message) => {
+      setChatMessages(prev =>
+        prev.some(m => m.id === message.id)
+          ? prev
+          : [...prev, { id: message.id, from: message.from, text: message.text, createdAt: message.createdAt }]
+      );
+    },
+    onChatHistory: ({ gameId, messages }) => {
+      setChatHistories(prev => ({ ...prev, [gameId]: messages }));
     },
   });
 
@@ -112,6 +127,8 @@ export default function App() {
     setWaitingInvites([]);
     setCooldownInvites([]);
     setReactions([]);
+    setChatMessages([]);
+    setChatHistories({});
   };
 
   const handleInvite = (targetUsername: string) => {
@@ -142,6 +159,7 @@ export default function App() {
     }
     setGameState(null);
     setReactions([]);
+    setChatMessages([]);
     setView('lobby');
   };
 
@@ -149,6 +167,17 @@ export default function App() {
     if (!gameState?.id || !username) return;
     socket.emit('send_reaction', { gameId: gameState.id, emoji });
     pushReaction(emoji, username, true);
+  };
+
+  // The sent message is not rendered optimistically: the server echoes it back
+  // to both players so ids and ordering come from a single source.
+  const handleSendChat = (text: string) => {
+    if (!gameState?.id) return;
+    socket.emit('send_chat', { gameId: gameState.id, text });
+  };
+
+  const handleLoadChatHistory = (gameId: string) => {
+    socket.emit('get_chat_history', gameId);
   };
 
   return (
@@ -162,6 +191,8 @@ export default function App() {
           users={users}
           invitations={invitations}
           history={history}
+          chatHistories={chatHistories}
+          onLoadChatHistory={handleLoadChatHistory}
           waitingInvites={waitingInvites}
           cooldownInvites={cooldownInvites}
           theme={theme}
@@ -184,9 +215,11 @@ export default function App() {
           xColor={xColor}
           oColor={oColor}
           reactions={reactions}
+          chatMessages={chatMessages}
           onMakeMove={handleMakeMove}
           onLeave={handleLeaveGame}
           onSendReaction={handleSendReaction}
+          onSendChat={handleSendChat}
         />
       )}
       {view === 'computer' && (

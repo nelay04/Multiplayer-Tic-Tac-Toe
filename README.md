@@ -16,7 +16,8 @@
 |---|---|
 | **Real-time multiplayer** | Challenge any online player via live Socket.IO invitations |
 | **Lobby system** | See who's online, send/accept/decline invites with a cooldown timer |
-| **Match history** | View your last 10 games with full board snapshot replay |
+| **Live chat** | Real-time chat beside the board during a 1v1 match, stored encrypted at rest |
+| **Match history** | View your last 10 games with full board snapshot replay and a read-only chat transcript |
 | **vs Computer** | AI Practice mode with Easy / Medium / Hard modes |
 | **Customisation** | Toggle dark/light mode, pick X/O piece colors from presets or custom |
 | **Toast notifications** | Non-intrusive toasts for invites, moves, and errors |
@@ -85,7 +86,11 @@ Switch between dark and light mode and choose from four colour presets (or pick 
 │   ├── index.ts             # Entry point = HTTP, Vite middleware, DB connect
 │   ├── models/
 │   │   ├── User.ts          # Mongoose User schema & model
-│   │   └── Game.ts          # Mongoose Game schema & model
+│   │   ├── Game.ts          # Mongoose Game schema & model
+│   │   └── Message.ts       # Mongoose Message schema (encrypted chat)
+│   ├── utils/
+│   │   ├── password.ts      # Argon2id password hashing & verification
+│   │   └── encryption.ts    # AES-256-GCM encryption for chat messages
 │   └── socket/
 │       └── handlers.ts      # All Socket.IO event handlers
 └── src/                     # Frontend (React / TypeScript)
@@ -93,7 +98,7 @@ Switch between dark and light mode and choose from four colour presets (or pick 
     ├── App.tsx              # Root component = view routing & global state
     ├── index.css            # Global styles (Tailwind + fonts)
     ├── types/
-    │   └── index.ts         # Shared interfaces (UserType, GameState, GameHistory, Theme)
+    │   └── index.ts         # Shared interfaces (UserType, GameState, GameHistory, ChatMessage, Theme)
     ├── hooks/
     │   └── useSocketEvents.ts  # Custom hook = Socket.IO listener lifecycle
     ├── lib/
@@ -102,6 +107,7 @@ Switch between dark and light mode and choose from four colour presets (or pick 
         ├── Login.tsx        # Login / register form
         ├── Lobby.tsx        # Players list, invitations, match history, settings
         ├── Game.tsx         # Live multiplayer game board
+        ├── Chat.tsx         # Chat panel (live composer + view-only transcript)
         ├── ComputerGame.tsx # vs-Computer board with AI
         └── Toast.tsx        # Toast notification component
 ```
@@ -137,6 +143,7 @@ Switch between dark and light mode and choose from four colour presets (or pick 
    MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/tic_tac_toe?retryWrites=true&w=majority
    PORT=3000
    NODE_ENV=development
+   CHAT_ENCRYPTION_KEY=<64 hex characters, see Environment Variables>
    ```
 
 ### Running in Development
@@ -178,7 +185,7 @@ docker compose up --build
 This will:
 
 1. Build the image from [docker/Dockerfile](docker/Dockerfile) — installs dependencies and runs `npm run build` to produce `dist/`.
-2. Start the container via [docker/entrypoint.sh](docker/entrypoint.sh), which fails fast if `MONGODB_URI`, `PORT`, or `NODE_ENV` are missing from `.env`.
+2. Start the container via [docker/entrypoint.sh](docker/entrypoint.sh), which fails fast if `MONGODB_URI`, `PORT`, `NODE_ENV`, or `CHAT_ENCRYPTION_KEY` are missing from `.env`.
 3. Run `npm start`, publishing the container on `${PORT}` (from `.env`) mapped to the same host port.
 
 The app will be available at `http://localhost:$PORT` (using the `PORT` value from your `.env`).
@@ -218,3 +225,13 @@ docker compose down
 | `MONGODB_URI` | Yes | = | Full MongoDB connection string |
 | `PORT` | No | `3000` | Port the HTTP server listens on |
 | `NODE_ENV` | No | `development` | Set to `production` to serve the static build |
+| `CHAT_ENCRYPTION_KEY` | Yes | = | 32-byte key (64 hex chars) used to encrypt chat messages at rest |
+
+Generate a chat key with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Keep it out of version control and stable across deploys: rotating it makes
+existing transcripts unreadable, and they render as `[unable to decrypt message]`.
