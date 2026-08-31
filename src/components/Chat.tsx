@@ -16,6 +16,13 @@ interface ChatProps {
   emptyLabel?: string;
   className?: string;
   onSend?: (text: string) => void;
+  /**
+   * Quick-reaction emojis rendered above the composer. Omitted in read-only
+   * mode, where there is nothing to react to any more.
+   */
+  reactionEmojis?: string[];
+  reactionsDisabled?: boolean;
+  onSendReaction?: (emoji: string) => void;
 }
 
 function formatTime(value: string) {
@@ -31,6 +38,9 @@ export default function Chat({
   emptyLabel = 'No messages yet.',
   className = '',
   onSend,
+  reactionEmojis,
+  reactionsDisabled = false,
+  onSendReaction,
 }: ChatProps) {
   const [draft, setDraft] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -42,6 +52,7 @@ export default function Chat({
   }, [messages.length]);
 
   const canSend = !readOnly && !locked && draft.trim().length > 0;
+  const hasReactions = !readOnly && !!reactionEmojis?.length;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,10 +116,29 @@ export default function Chat({
         )}
       </div>
 
+      {hasReactions && (
+        <div className="flex justify-between items-center gap-0.5 px-3 pt-2 border-t border-zinc-200 dark:border-zinc-800">
+          {reactionEmojis!.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => onSendReaction?.(emoji)}
+              disabled={reactionsDisabled}
+              className="text-2xl w-9 h-9 flex items-center justify-center rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 active:scale-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              aria-label={`Send ${emoji} reaction`}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
+
       {!readOnly && (
         <form
           onSubmit={handleSubmit}
-          className="flex items-center gap-2 p-3 border-t border-zinc-200 dark:border-zinc-800"
+          className={`flex items-center gap-2 px-3 pb-3 pt-2 ${
+            hasReactions ? '' : 'border-t border-zinc-200 dark:border-zinc-800'
+          }`}
         >
           <input
             type="text"
