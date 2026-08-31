@@ -84,8 +84,8 @@ export default function Game({ currentUser, gameState, xColor, oColor, reactions
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-4 transition-colors">
-      <div className="w-full max-w-5xl flex flex-col lg:flex-row lg:items-stretch lg:justify-center gap-6">
-        <div className="relative w-full max-w-md mx-auto lg:mx-0">
+      <div className="w-full max-w-5xl lg:max-w-7xl flex flex-col lg:flex-row lg:items-stretch lg:justify-between gap-6 lg:gap-16 xl:gap-24">
+        <div className="relative w-full max-w-md mx-auto lg:mx-0 lg:ml-12 xl:ml-24">
 
           <div className="flex justify-between items-center mb-8">
             <button 
