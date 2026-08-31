@@ -79,7 +79,7 @@ export default function Chat({
         )}
       </div>
 
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-2">
+      <div ref={scrollRef} className="chat-scroll flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 space-y-2">
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-center text-sm text-zinc-500 py-6">
             <p>{emptyLabel}</p>

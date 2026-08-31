@@ -539,7 +539,7 @@ export default function Lobby({
                       ? 'No messages were sent in this match.'
                       : 'Loading chat...'
                   }
-                  className="h-72 lg:h-auto lg:min-h-[420px]"
+                  className="h-72 lg:h-[460px]"
                 />
               </div>
             </motion.div>

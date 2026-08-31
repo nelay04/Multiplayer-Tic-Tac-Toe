@@ -215,18 +215,23 @@ export default function Game({ currentUser, gameState, xColor, oColor, reactions
 
         </div>
 
-        <Chat
-          currentUser={currentUser}
-          messages={chatMessages}
-          locked={status !== 'playing'}
-          lockedLabel="This match has ended."
-          emptyLabel="Say hello to your opponent."
-          onSend={onSendChat}
-          reactionEmojis={REACTION_EMOJIS}
-          reactionsDisabled={reactionCooldown || status !== 'playing'}
-          onSendReaction={handleSendReaction}
-          className="w-full max-w-md mx-auto lg:mx-0 lg:w-80 xl:w-96 lg:max-w-none h-[380px] lg:h-auto"
-        />
+        {/* The wrapper takes its height from the row (i.e. the board column) and
+            the panel fills it absolutely, so a long transcript scrolls instead
+            of stretching the card. */}
+        <div className="w-full max-w-md mx-auto lg:mx-0 lg:w-80 xl:w-96 lg:max-w-none h-[380px] lg:h-auto lg:relative">
+          <Chat
+            currentUser={currentUser}
+            messages={chatMessages}
+            locked={status !== 'playing'}
+            lockedLabel="This match has ended."
+            emptyLabel="Say hello to your opponent."
+            onSend={onSendChat}
+            reactionEmojis={REACTION_EMOJIS}
+            reactionsDisabled={reactionCooldown || status !== 'playing'}
+            onSendReaction={handleSendReaction}
+            className="h-full lg:absolute lg:inset-0"
+          />
+        </div>
       </div>
     </div>
   );

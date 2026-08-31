@@ -17,3 +17,39 @@ input {
   user-select: auto;
   -webkit-user-select: auto;
 }
+
+/* Slim, low-contrast scrollbar for the chat transcript: visible enough to grab,
+   quiet enough not to compete with the glass panel it sits in. */
+.chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(161 161 170 / 0.45) transparent;
+}
+
+.chat-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(161 161 170 / 0.4);
+  border-radius: 9999px;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(161 161 170 / 0.65);
+}
+
+.dark .chat-scroll {
+  scrollbar-color: rgb(255 255 255 / 0.18) transparent;
+}
+
+.dark .chat-scroll::-webkit-scrollbar-thumb {
+  background-color: rgb(255 255 255 / 0.16);
+}
+
+.dark .chat-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(255 255 255 / 0.3);
+}
